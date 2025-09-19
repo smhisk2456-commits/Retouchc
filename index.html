@@ -768,39 +768,66 @@
 
             loadingOverlay.style.display = 'flex';
             downloadBtn.style.display = 'none';
-            try {
-                const imageDataUrl = imageDataSource.toDataURL('image/png');
-                const base64ImageData = imageDataUrl.split(',')[1];
-                const payload = { contents: [{ parts: [{ text: userPrompt }, { inlineData: { mimeType: "image/png", data: base64ImageData } }] }] };
-                const apiKey = "";
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-                const result = await response.json();
-                const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-                if (base64Data) {
-                    const newImage = new Image();
-                    newImage.onload = async () => {
-                        originalImage = newImage;
-                        setupCanvas(newImage);
-                        downloadBtn.style.display = 'inline-block';
-                        if (!isAdmin) {
-                            const userDocRef = doc(db, "users", currentUser.uid);
-                            await updateDoc(userDocRef, { credits: increment(-creditCost) });
-                            credits -= creditCost;
-                            updateCreditDisplay();
-                        }
-                    };
-                    newImage.src = `data:image/png;base64,${base64Data}`;
-                } else { throw new Error('No image data received from API.'); }
-            } catch (error) {
-                console.error('API hatası:', error);
-                canvasHistory.pop();
-                updateUndoButton();
-            } finally {
-                loadingOverlay.style.display = 'none';
+
+            const maxRetries = 3;
+            let delay = 1000; // 1 saniye ile başla
+            let lastError = null;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const imageDataUrl = imageDataSource.toDataURL('image/png');
+                    const base64ImageData = imageDataUrl.split(',')[1];
+                    const payload = { contents: [{ parts: [{ text: userPrompt }, { inlineData: { mimeType: "image/png", data: base64ImageData } }] }] };
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+                    
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+                    if (base64Data) {
+                        const newImage = new Image();
+                        newImage.onload = async () => {
+                            originalImage = newImage;
+                            setupCanvas(newImage);
+                            downloadBtn.style.display = 'inline-block';
+                            if (!isAdmin) {
+                                const userDocRef = doc(db, "users", currentUser.uid);
+                                await updateDoc(userDocRef, { credits: increment(-creditCost) });
+                                credits -= creditCost;
+                                updateCreditDisplay();
+                            }
+                        };
+                        newImage.src = `data:image/png;base64,${base64Data}`;
+                        loadingOverlay.style.display = 'none';
+                        return; // Başarılı, fonksiyondan çık
+                    } else {
+                        throw new Error('No image data received from API.');
+                    }
+                } catch (error) {
+                    lastError = error;
+                    console.error(`Deneme ${i + 1} başarısız:`, error);
+                    if (i < maxRetries - 1) {
+                        await new Promise(res => setTimeout(res, delay));
+                        delay *= 2; // Exponential backoff
+                    }
+                }
             }
+
+            // Tüm denemeler başarısız olduysa
+            console.error('Tüm denemeler başarısız oldu. Son hata:', lastError);
+            canvasHistory.pop();
+            updateUndoButton();
+            loadingOverlay.style.display = 'none';
+            // Kullanıcıya bir hata mesajı gösterebiliriz
+            alert("İşlem şu anda gerçekleştirilemiyor. Lütfen daha sonra tekrar deneyin.");
         }
+
 
         eraseBtn.addEventListener('click', () => {
             const lang = getCookie('language') || 'tr';
