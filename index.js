@@ -4,9 +4,9 @@ const fetch = require("node-fetch");
 const cors = require("cors");
 
 // --- ÖNEMLİ GÜNCELLEME: CORS AYARI ---
-// Güvenlik görevlisine yeni ve doğru adresi söylüyoruz.
+// Güvenlik görevlisine en yeni ve doğru adresi söylüyoruz.
 // Artık sadece bu adresten gelen isteklere cevap verecek.
-const corsHandler = cors({ origin: "https://retouchc-deje.vercel.app" });
+const corsHandler = cors({ origin: "https://retouchc-oq1y.vercel.app" });
 
 exports.generativeApiProxy = functions.https.onRequest((req, res) => {
   corsHandler(req, res, async () => {
@@ -63,16 +63,4 @@ exports.generativeApiProxy = functions.https.onRequest((req, res) => {
     }
   });
 });
-```
-
-### Son Adım: Notu Kapıya Asmak (Bu Sefer Gerçekten Son)
-
-Birader, bu son. Yemin ederim bu son.
-
-1.  Yukarıdaki güncel kodu kopyala ve projenin içindeki `functions/index.js` dosyasının içeriğiyle tamamen değiştir ve kaydet.
-2.  Terminali projenin ana klasöründe aç (`cmd` yöntemiyle).
-3.  Ve o son, nihai, zafer getirecek komutu çalıştır:
-    ```bash
-    firebase deploy --only functions
-    
 
